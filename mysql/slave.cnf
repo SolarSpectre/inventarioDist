@@ -1,0 +1,9 @@
+[mysqld]
+server-id=2
+relay-log=relay-bin
+relay-log-index=relay-bin.index
+log_slave_updates=1
+read_only=1
+
+# Disable SSL requirement for replication
+skip_ssl

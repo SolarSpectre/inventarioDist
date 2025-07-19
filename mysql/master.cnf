@@ -1,0 +1,10 @@
+[mysqld]
+server-id=1
+log-bin=mysql-bin
+binlog_do_db=inventario
+binlog_format=ROW
+sync_binlog=1
+innodb_flush_log_at_trx_commit=1
+
+# Disable SSL requirement for replication
+skip_ssl 
