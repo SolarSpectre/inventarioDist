@@ -1,0 +1,171 @@
+services:
+  mysql-master:
+    image: mysql:8.0
+    container_name: inventario-mysql-master
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: inventario
+      MYSQL_USER: inventario_user
+      MYSQL_PASSWORD: inventario_password
+      MYSQL_REPLICATION_USER: replicator
+      MYSQL_REPLICATION_PASSWORD: replicator_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_master_data:/var/lib/mysql
+      - ./mysql/master.cnf:/etc/mysql/conf.d/master.cnf
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - inventario-network
+    command: --server-id=1 --log-bin=mysql-bin
+
+  mysql-slave:
+    image: mysql:8.0
+    container_name: inventario-mysql-slave
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: inventario
+      MYSQL_USER: inventario_user
+      MYSQL_PASSWORD: inventario_password
+      MYSQL_REPLICATION_USER: replicator
+      MYSQL_REPLICATION_PASSWORD: replicator_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_slave_data:/var/lib/mysql
+      - ./mysql/slave.cnf:/etc/mysql/conf.d/slave.cnf
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - inventario-network
+    depends_on:
+      - mysql-master
+    command: --server-id=2 --log-bin=mysql-bin
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: inventario-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOSTS: "inventario-mysql-master,inventario-mysql-slave"
+      PMA_ARBITRARY: 1
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "8080:80"
+    networks:
+      - inventario-network
+    depends_on:
+      - mysql-master
+
+  mysql-replication-setup:
+    image: mysql:8.0
+    container_name: inventario-mysql-replication-setup
+    restart: "no"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+    volumes:
+      - ./mysql/setup-replication.sh:/setup-replication.sh
+    networks:
+      - inventario-network
+    depends_on:
+      - mysql-master
+      - mysql-slave
+    command: >
+      bash -c "
+        chmod +x /setup-replication.sh &&
+        /setup-replication.sh
+      "
+
+  app-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inventario-app-1
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: mysql-master
+      MYSQL_USER: inventario_user
+      MYSQL_PASSWORD: inventario_password
+      MYSQL_DATABASE: inventario
+      MYSQL_PORT: 3306
+      
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    depends_on:
+      - mysql-master
+      - mysql-replication-setup
+    networks:
+      - inventario-network
+
+  app-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inventario-app-2
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: mysql-master
+      MYSQL_USER: inventario_user
+      MYSQL_PASSWORD: inventario_password
+      MYSQL_DATABASE: inventario
+      MYSQL_PORT: 3306
+      
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    depends_on:
+      - mysql-master
+      - mysql-replication-setup
+    networks:
+      - inventario-network
+
+  app-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inventario-app-3
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: mysql-master
+      MYSQL_USER: inventario_user
+      MYSQL_PASSWORD: inventario_password
+      MYSQL_DATABASE: inventario
+      MYSQL_PORT: 3306
+      
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    depends_on:
+      - mysql-master
+      - mysql-replication-setup
+    networks:
+      - inventario-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: inventario-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - inventario-network
+    depends_on:
+      - app-1
+      - app-2
+      - app-3
+
+volumes:
+  mysql_master_data:
+  mysql_slave_data:
+
+networks:
+  inventario-network:
+    driver: bridge 
