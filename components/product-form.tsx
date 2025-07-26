@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,41 +10,67 @@ interface ProductFormProps {
   onSubmit: (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
   onCancel: () => void
   isLoading?: boolean
+  product?: Product | null;
 }
 
-export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFormProps) {
+export function ProductForm({
+  onSubmit,
+  onCancel,
+  isLoading = false,
+  product = null,
+}: ProductFormProps) {
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    category: '',
+    name: "",
+    description: "",
+    category: "",
     stock_quantity: 0,
-    image_url: ''
-  })
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [errors, setErrors] = useState<Record<string, string>>({})
+    image_url: "",
+  });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (product) {
+      setFormData({
+        name: product.name,
+        description: product.description,
+        category: product.category,
+        stock_quantity: product.stock_quantity,
+        image_url: product.image_url,
+      });
+    } else {
+      setFormData({
+        name: "",
+        description: "",
+        category: "",
+        stock_quantity: 0,
+        image_url: "",
+      });
+    }
+  }, [product]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     
     if (!formData.name.trim()) {
-      newErrors.name = 'Product name is required'
+      newErrors.name = 'El nombre es requerido'
     }
     
     if (!formData.description.trim()) {
-      newErrors.description = 'Description is required'
+      newErrors.description = 'La descripcion es requerida'
     }
     
     if (!formData.category.trim()) {
-      newErrors.category = 'Category is required'
+      newErrors.category = 'La categoria es requerida'
     }
     
     if (formData.stock_quantity < 0) {
-      newErrors.stock_quantity = 'Stock quantity cannot be negative'
+      newErrors.stock_quantity = 'La cantidad de stock no puede ser negativa'
     }
     
     if (!imageFile && !formData.image_url) {
-      newErrors.image = 'Either upload an image or provide an image URL'
+      newErrors.image = 'Sube una imagen o ingresa una url'
     }
     
     setErrors(newErrors)
@@ -95,12 +121,12 @@ export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFo
 
       // Reset form
       setFormData({
-        name: '',
-        description: '',
-        category: '',
+        name: "",
+        description: "",
+        category: "",
         stock_quantity: 0,
-        image_url: ''
-      })
+        image_url: "",
+      });
       setImageFile(null)
       setErrors({})
       
@@ -130,7 +156,7 @@ export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFo
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="name">Product Name *</Label>
+        <Label htmlFor="name">Producto *</Label>
         <Input
           id="name"
           value={formData.name}
@@ -138,14 +164,14 @@ export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFo
             setFormData(prev => ({ ...prev, name: e.target.value }))
             setErrors(prev => ({ ...prev, name: '' }))
           }}
-          placeholder="Enter product name"
+          placeholder="Ingresa el nombre del producto"
           className={errors.name ? 'border-red-500' : ''}
         />
         {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="description">Description *</Label>
+        <Label htmlFor="description">Descripcion *</Label>
         <textarea
           id="description"
           value={formData.description}
@@ -153,7 +179,7 @@ export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFo
             setFormData(prev => ({ ...prev, description: e.target.value }))
             setErrors(prev => ({ ...prev, description: '' }))
           }}
-          placeholder="Enter product description"
+          placeholder="Ingresa la descripcion del producto"
           className={`w-full p-2 border rounded-md resize-none h-20 ${
             errors.description ? 'border-red-500' : 'border-input'
           }`}
@@ -162,7 +188,7 @@ export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFo
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="category">Category *</Label>
+        <Label htmlFor="category">Categoria *</Label>
         <Input
           id="category"
           value={formData.category}
@@ -170,14 +196,14 @@ export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFo
             setFormData(prev => ({ ...prev, category: e.target.value }))
             setErrors(prev => ({ ...prev, category: '' }))
           }}
-          placeholder="Enter product category"
+          placeholder="Ingresa la categoria del producto"
           className={errors.category ? 'border-red-500' : ''}
         />
         {errors.category && <p className="text-sm text-red-500">{errors.category}</p>}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="stock_quantity">Stock Quantity *</Label>
+        <Label htmlFor="stock_quantity">Cantidad de Stock *</Label>
         <Input
           id="stock_quantity"
           type="number"
@@ -187,14 +213,14 @@ export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFo
             setFormData(prev => ({ ...prev, stock_quantity: parseInt(e.target.value) || 0 }))
             setErrors(prev => ({ ...prev, stock_quantity: '' }))
           }}
-          placeholder="Enter stock quantity"
+          placeholder="Ingresa la cantidad de stock del producto"
           className={errors.stock_quantity ? 'border-red-500' : ''}
         />
         {errors.stock_quantity && <p className="text-sm text-red-500">{errors.stock_quantity}</p>}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="image">Product Image</Label>
+        <Label htmlFor="image">Imagen del Producto</Label>
         <div className="space-y-2">
           <Input
             id="image"
@@ -203,7 +229,7 @@ export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFo
             onChange={handleImageChange}
             className={errors.image ? 'border-red-500' : ''}
           />
-          <p className="text-sm text-gray-500">Or provide an image URL:</p>
+          <p className="text-sm text-gray-500">O ingresa una URL de imagen:</p>
           <Input
             type="url"
             placeholder="https://example.com/image.jpg"
@@ -228,15 +254,18 @@ export function ProductForm({ onSubmit, onCancel, isLoading = false }: ProductFo
           onClick={onCancel}
           disabled={uploading || isLoading}
         >
-          Cancel
+          Cancelar
         </Button>
-        <Button
-          type="submit"
-          disabled={uploading || isLoading}
-        >
-          {uploading || isLoading ? 'Creating...' : 'Create Product'}
+        <Button type="submit" disabled={uploading || isLoading}>
+          {isLoading
+            ? product
+              ? "Actualizando..."
+              : "Creando..."
+            : product
+            ? "Actualizar Producto"
+            : "Crear Producto"}
         </Button>
       </div>
     </form>
-  )
+  );
 } 

@@ -8,17 +8,42 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { ProductForm } from "@/components/product-form"
-import { Search, Plus, Package, AlertCircle } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ProductForm } from "@/components/product-form";
+import { Search, Plus, Package, AlertCircle, MoreVertical, Edit, Trash2 } from "lucide-react";
 
 export default function ProtectedPage() {
   const [user, setUser] = useState<unknown>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(true)
-  const [isCreating, setIsCreating] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const supabase = createClient()
@@ -65,39 +90,99 @@ export default function ProtectedPage() {
     fetchProducts(searchTerm)
   }
 
-  const handleCreateProduct = async (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
-    try {
-      setIsCreating(true)
-      setError(null)
-      
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+  const handleCreateProduct = async (
+    productData: Omit<Product, "id" | "created_at" | "updated_at">
+  ) => {
+    await handleSubmit(async () => {
+      const response = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(productData),
-      })
-      
+      });
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create product')
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create product");
+      }
+
+      const newProduct = await response.json();
+      setProducts((prev) => [newProduct, ...prev]);
+      setIsModalOpen(false);
+    });
+  };
+
+  const handleUpdateProduct = async (
+    productData: Omit<Product, "id" | "created_at" | "updated_at">
+  ) => {
+    if (!editingProduct) return;
+
+    await handleSubmit(async () => {
+      const response = await fetch(`/api/products/${editingProduct.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update product");
+      }
+
+      await fetchProducts(searchTerm);
+      setIsModalOpen(false);
+    });
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!deletingProduct) return;
+
+    await handleSubmit(async () => {
+      const response = await fetch(`/api/products/${deletingProduct.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete product");
       }
       
-      const newProduct = await response.json()
-      setProducts(prev => [newProduct, ...prev])
-      setIsModalOpen(false)
+      setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
+    });
+  };
+
+  const handleSubmit = async (action: () => Promise<void>) => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      await action();
     } catch (error: unknown) {
-      console.error('Error creating product:', error)
-      setError(error instanceof Error ? error.message : 'Failed to create product')
+      setError(error instanceof Error ? error.message : "An unknown error occurred");
     } finally {
-      setIsCreating(false)
+      setIsSubmitting(false);
+      setEditingProduct(null);
+      closeDeleteConfirm();
     }
-  }
+  };
+  
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setIsModalOpen(true);
+  };
+  
+  const openDeleteConfirm = (product: Product) => {
+    setDeletingProduct(product);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const closeDeleteConfirm = () => {
+    setDeletingProduct(null);
+    setIsDeleteConfirmOpen(false);
+  };
 
   const getStockStatus = (quantity: number) => {
-    if (quantity === 0) return { text: 'Out of Stock', variant: 'destructive' as const }
-    if (quantity < 10) return { text: 'Low Stock', variant: 'secondary' as const }
-    return { text: 'In Stock', variant: 'default' as const }
+    if (quantity === 0) return { text: 'Sin Stock', variant: 'destructive' as const }
+    if (quantity < 10) return { text: 'Bajo Stock', variant: 'secondary' as const }
+    return { text: 'En Stock', variant: 'default' as const }
   }
 
   if (!user) {
@@ -109,24 +194,28 @@ export default function ProtectedPage() {
       <div className="w-full">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Product Management</h1>
-            <p className="text-muted-foreground">Manage your product inventory</p>
+            <h1 className="text-3xl font-bold">Gestion de Inventario</h1>
+            <p className="text-muted-foreground">Gestiona tu inventario de productos</p>
           </div>
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Product
+                Agregar Producto
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Create New Product</DialogTitle>
+                <DialogTitle>{editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}</DialogTitle>
               </DialogHeader>
               <ProductForm
-                onSubmit={handleCreateProduct}
-                onCancel={() => setIsModalOpen(false)}
-                isLoading={isCreating}
+                onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
+                onCancel={() => {
+                  setIsModalOpen(false);
+                  setEditingProduct(null);
+                }}
+                isLoading={isSubmitting}
+                product={editingProduct}
               />
             </DialogContent>
           </Dialog>
@@ -139,14 +228,14 @@ export default function ProtectedPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
                 type="text"
-                placeholder="Search products by name, description, or category..."
+                placeholder="Buscar productos por nombre, descripcion, or categoria..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
             <Button type="submit" disabled={isLoading}>
-              Search
+              Buscar
             </Button>
             {searchTerm && (
               <Button
@@ -157,7 +246,7 @@ export default function ProtectedPage() {
                   fetchProducts()
                 }}
               >
-                Clear
+                Limpiar
               </Button>
             )}
           </div>
@@ -189,14 +278,14 @@ export default function ProtectedPage() {
         ) : products.length === 0 ? (
           <div className="text-center py-12">
             <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No products found</h3>
+            <h3 className="text-lg font-semibold mb-2">No se encuentran productos</h3>
             <p className="text-muted-foreground mb-4">
               {searchTerm ? 'Try adjusting your search terms' : 'Get started by adding your first product'}
             </p>
             {!searchTerm && (
               <Button onClick={() => setIsModalOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Product
+                Agregar Producto
               </Button>
             )}
           </div>
@@ -219,9 +308,31 @@ export default function ProtectedPage() {
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start gap-2">
                       <CardTitle className="text-lg line-clamp-2">{product.name}</CardTitle>
-                      <Badge variant={stockStatus.variant}>
-                        {stockStatus.text}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={stockStatus.variant}>
+                          {stockStatus.text}
+                        </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(product)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openDeleteConfirm(product)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                     <CardDescription className="line-clamp-2">
                       {product.description}
@@ -243,6 +354,28 @@ export default function ProtectedPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta accion no se puede deshacer. Esto eliminara permanentemente el producto
+              <span className="font-bold"> {deletingProduct?.name}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={closeDeleteConfirm}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProduct}
+              disabled={isSubmitting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isSubmitting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -44,7 +44,20 @@ export async function getProductsBySearch(searchTerm: string): Promise<Product[]
   }
 }
 
-export async function createProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<Product> {
+export async function getProductById(id: number): Promise<Product | null> {
+  try {
+    const [rows] = await pool.execute("SELECT * FROM products WHERE id = ?", [id]);
+    const products = rows as Product[];
+    return products.length > 0 ? products[0] : null;
+  } catch (error) {
+    console.error("Error fetching product by id:", error);
+    throw error;
+  }
+}
+
+export async function createProduct(
+  product: Omit<Product, "id" | "created_at" | "updated_at">
+): Promise<Product> {
   try {
     // Check if product with same name already exists
     const [existing] = await pool.execute(
