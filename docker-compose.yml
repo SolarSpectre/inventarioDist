@@ -101,6 +101,8 @@ services:
       - mysql-replication-setup
     networks:
       - inventario-network
+    mem_limit: 1g
+    cpus: 2.0
 
   app-2:
     build:
